@@ -18,10 +18,47 @@ def draw_tracker_settings_window(state):
     # Instrument / Velocity
     imgui.separator()
 
-    # NEW: Define Instrument toggle
+    # Define Instrument toggle with +/- bumpers
     changed, definst = imgui.checkbox("Define Instrument", cfg.define_instrument)
     if changed:
         cfg.define_instrument = definst
+
+    # Put +/- on the same line
+    imgui.same_line()
+    _btn = getattr(imgui, "small_button", imgui.button)  # fallback if small_button missing
+
+    # Dim and disable when Define Instrument is off
+    _dimmed = False
+    if not cfg.define_instrument:
+        try:
+            style = imgui.get_style()
+            imgui.push_style_var(imgui.STYLE_ALPHA, style.alpha * 0.5)
+            _dimmed = True
+        except Exception:
+            pass
+
+    if _btn(" - "):
+        if cfg.define_instrument:
+            try:
+                v = int(cfg.instrument_hex or "0", 16)
+            except Exception:
+                v = 0
+            v = max(0, min(255, v - 1))
+            cfg.instrument_hex = f"{v:02X}"
+
+    imgui.same_line()
+
+    if _btn(" + "):
+        if cfg.define_instrument:
+            try:
+                v = int(cfg.instrument_hex or "0", 16)
+            except Exception:
+                v = 0
+            v = max(0, min(255, v + 1))
+            cfg.instrument_hex = f"{v:02X}"
+
+    if _dimmed:
+        imgui.pop_style_var()
 
     # Instrument (hex) — dim and read-only if Define Instrument is off
     readonly_flag = getattr(imgui, "INPUT_TEXT_READ_ONLY", 0)
@@ -73,9 +110,9 @@ def draw_tracker_settings_window(state):
     imgui.text("Note-off")
     off_off  = (cfg.note_off_mode == "OFF")
     off_rel  = (cfg.note_off_mode == "REL")
-    if imgui.radio_button("OFF", off_off): cfg.note_off_mode = "OFF"
-    imgui.same_line()
     if imgui.radio_button("REL", off_rel): cfg.note_off_mode = "REL"
+    imgui.same_line()
+    if imgui.radio_button("OFF", off_off): cfg.note_off_mode = "OFF"
 
     # Polyphony
     imgui.separator()

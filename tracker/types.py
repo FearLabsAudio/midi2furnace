@@ -9,7 +9,7 @@ class FurnaceConfig:
     define_instrument: bool = False
     velocity_enabled: bool = False
     velocity_max_hex: str = "FF"
-    note_off_mode: str = "OFF"
+    note_off_mode: str = "REL"
     polyphony_mode: str = "per_track"
     spillover_count: int = 3
 
@@ -18,7 +18,7 @@ class FurnaceConfig:
         self.velocity_max_hex = f"{int(self.velocity_max_hex or 'FF', 16) & 0xFF:02X}"
         self.transpose_octaves = max(-6, min(6, int(self.transpose_octaves)))
         if self.note_off_mode not in ("OFF", "REL"):
-            self.note_off_mode = "OFF"
+            self.note_off_mode = "REL"
         if self.polyphony_mode not in ("per_track", "spillover"):
             self.polyphony_mode = "per_track"
         self.spillover_count = max(1, min(16, int(self.spillover_count)))

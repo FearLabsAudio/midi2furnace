@@ -154,8 +154,9 @@ def build_furnace_clipboard_text(state, cfg: FurnaceConfig) -> Tuple[bool, str]:
             # place note-on
             grid[sl_rel][free] = _note_on_cell(pitch, vel, cfg)
             # schedule OFF at el_rel if no new note-on overwrites it
-            off_events.setdefault(el_rel, []).append(free)
-            chan_ends[free] = el_rel
+            off_line = max(0, min(el_rel, total_lines - 1))
+            off_events.setdefault(off_line, []).append(free)
+            chan_ends[free] = el_rel  # keep true end for channel availability
 
         # emit OFFs
         for line, subs in off_events.items():
@@ -176,29 +177,41 @@ def build_furnace_clipboard_text(state, cfg: FurnaceConfig) -> Tuple[bool, str]:
 
     grid: List[List[str]] = [[_blank_cell() for _ in range(chans)] for __ in range(total_lines)]
 
-    # Overlap counting per *included* track
-    active_counts: Dict[int, int] = {ti: 0 for ti in track_order}
-    dec_events: Dict[int, List[int]] = {}  # line -> list[ti]
+    # Count starts/ends per track, per line
+    from typing import Dict
+    starts_by_track: Dict[int, Dict[int, int]] = {ti: {} for ti in track_order}
+    ends_by_track:   Dict[int, Dict[int, int]] = {ti: {} for ti in track_order}
 
-    # place note-ons, remember when to decrement
+    # Place note-ons and record start/end counts
     for (ti, sl, el, pitch, vel) in sorted(items, key=lambda x: (x[0], x[1], x[2], x[3])):
         if ti not in track_to_ch:
             continue
         ch = track_to_ch[ti]
         sl_rel = sl - min_line
         el_rel = el - min_line
+        # place note-on (latest wins if multiple at same line)
         grid[sl_rel][ch] = _note_on_cell(pitch, vel, cfg)
-        active_counts[ti] = active_counts.get(ti, 0) + 1
-        dec_events.setdefault(el_rel, []).append(ti)
+        # record start
+        starts_by_track[ti][sl_rel] = starts_by_track[ti].get(sl_rel, 0) + 1
+        # clamp OFF line to last row (so boundary notes still get an OFF)
+        off_line = max(0, min(el_rel, total_lines - 1))
+        ends_by_track[ti][off_line] = ends_by_track[ti].get(off_line, 0) + 1
 
-    # emit OFFs when last overlapping note ends (per track)
-    for line in range(total_lines):
-        for ti in dec_events.get(line, []):
-            active_counts[ti] = max(0, active_counts.get(ti, 0) - 1)
-            if active_counts[ti] == 0:
-                ch = track_to_ch[ti]
+    # Emit OFF/REL when the last overlap ends and no new start occurs on that line
+    for ti in track_order:
+        ch = track_to_ch[ti]
+        cur = 0  # active overlapping notes on this track
+        for line in range(total_lines):
+            s = starts_by_track[ti].get(line, 0)
+            e = ends_by_track[ti].get(line, 0)
+            cur += s
+            cur_after = cur - e
+            # If everything ended on this line AND nothing starts on this line,
+            # we need an OFF/REL (unless a note-on already occupies the cell).
+            if e > 0 and cur_after == 0 and s == 0:
                 if grid[line][ch] == _blank_cell():
                     grid[line][ch] = _off_cell(cfg)
+            cur = cur_after
 
     # compose
     bar = "|"
