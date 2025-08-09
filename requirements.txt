@@ -1,0 +1,6 @@
+pygame>=2.5.2
+PyOpenGL>=3.1.6
+imgui[pygame]>=2.0.0
+mido>=1.2.10
+pyperclip>=1.8.2    
+watchdog>=4.0.0     
