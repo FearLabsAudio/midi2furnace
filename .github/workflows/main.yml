@@ -6,7 +6,7 @@ on:
     tags: [ "v*" ]
 
 permissions:
-  contents: write  # needed for release upload
+  contents: write
 
 jobs:
   build:
@@ -21,7 +21,7 @@ jobs:
             artifact: midi2furnace-win-x64
           - os: macos-latest
             py: "3.11"
-            arch: arm64   # GitHub macOS runners are Apple Silicon
+            arch: arm64
             artifact: midi2furnace-mac-arm64
           - os: ubuntu-22.04
             py: "3.11"
@@ -43,8 +43,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgl1 libglib2.0-0 libasound2 \
-            libx11-6 libxext6 libxrender1 libxcursor1 libxrandr2 libxi6 libxxf86vm1 zip
+            libgl1 libegl1 libglib2.0-0 libasound2 \
+            libx11-6 libxext6 libxrender1 libxcursor1 libxrandr2 libxi6 libxxf86vm1 \
+            libsm6 libice6 zip
 
       - name: Install Python deps
         run: |
@@ -52,19 +53,17 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build (PyInstaller onedir)
+      - name: Build (PyInstaller onedir, CI spec)
         run: |
-          python -c "import os; print('CWD:', os.getcwd())"
-          pyinstaller --noconfirm --workpath .pyibld build/midi2furnace.spec
+          rm -rf dist .pyibld || true
+          pyinstaller --noconfirm --workpath .pyibld --distpath dist build/midi2furnace_ci.spec
 
-      # Windows-only: remove extra root exe if PyInstaller drops one
-      - name: Cleanup extra root exe (Windows)
+      - name: Cleanup extra root exe (Windows quirk)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           if (Test-Path dist\midi2furnace.exe) { Remove-Item dist\midi2furnace.exe -Force }
 
-      # Zip per OS
       - name: Zip artifact (Windows)
         if: runner.os == 'Windows'
         shell: pwsh

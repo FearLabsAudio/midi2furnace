@@ -1,6 +1,6 @@
-# build/midi2furnace.spec
-# Build locally with:
-#   pyinstaller --noconfirm --workpath .pyibld build/midi2furnace.spec
+# build/midi2furnace_ci.spec
+# Build in CI with:
+#   pyinstaller --noconfirm --workpath .pyibld --distpath dist build/midi2furnace_ci.spec
 import os, sys
 from PyInstaller.utils.hooks import collect_submodules
 
@@ -8,7 +8,6 @@ PROJECT_DIR = os.path.abspath(os.getcwd())
 ENTRY_SCRIPT = os.path.join(PROJECT_DIR, "midi2fur.py")
 APP_NAME = "midi2furnace"
 
-# Hidden imports for runtime-discovered modules
 hidden = []
 hidden += collect_submodules("imgui")
 hidden += ["imgui.integrations.pygame"]
@@ -18,30 +17,8 @@ hidden += collect_submodules("mido")
 if sys.platform.startswith("win"):
     hidden += ["OpenGL.platform.win32"]
 
-# Optional data files (ONLY real files; never folders)
-datas = []
+datas = []  # keep CI minimal & predictable
 
-def add_file(rel_path, dest="."):
-    p = os.path.join(PROJECT_DIR, rel_path)
-    if os.path.isfile(p):
-        datas.append((p, dest))
-
-def add_tree(rel_folder, dest_folder):
-    root = os.path.join(PROJECT_DIR, rel_folder)
-    if not os.path.isdir(root):
-        return
-    for r, _d, files in os.walk(root):
-        for f in files:
-            datas.append((os.path.join(r, f),
-                          os.path.join(dest_folder, os.path.relpath(r, root)) if os.path.relpath(r, root) != "." else dest_folder))
-
-# Safely include a few nice-to-haves (comment any out if undesired)
-add_file("readme.md", ".")
-add_file("requirements.txt", ".")
-# add_tree("sample MIDI files", "sample MIDI files")  # enable if you want to ship samples
-# add_file("imgui.ini", ".")  # include a seeded layout if you like
-
-# Icons if present
 icon_file = None
 win_icon = os.path.join(PROJECT_DIR, "assets", "app.ico")
 mac_icon = os.path.join(PROJECT_DIR, "assets", "app.icns")
@@ -74,18 +51,17 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,       # fewer surprises in CI
     console=False,   # GUI app
     icon=icon_file,
 )
 
-# One-dir (folder) build — most reliable for pygame/opengl
 coll = COLLECT(
     exe,
     a.binaries,
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     name=APP_NAME,
 )
