@@ -2,8 +2,11 @@ name: build-binaries
 
 on:
   push:
-    branches: [ main, master ]   # build on pushes to main
-    tags: [ "v*" ]               # and also on tags like v0.1.0
+    branches: [ main, master ]
+    tags: [ "v*" ]
+
+permissions:
+  contents: write  # needed for release upload
 
 jobs:
   build:
@@ -14,13 +17,16 @@ jobs:
         include:
           - os: windows-latest
             py: "3.11"
-            artifact: midi2furnace-win-${{ runner.arch }}
+            arch: x64
+            artifact: midi2furnace-win-x64
           - os: macos-latest
             py: "3.11"
-            artifact: midi2furnace-mac-${{ runner.arch }}
+            arch: arm64   # GitHub macOS runners are Apple Silicon
+            artifact: midi2furnace-mac-arm64
           - os: ubuntu-22.04
             py: "3.11"
-            artifact: midi2furnace-linux-${{ runner.arch }}
+            arch: x64
+            artifact: midi2furnace-linux-x64
 
     steps:
       - name: Checkout
@@ -38,7 +44,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libgl1 libglib2.0-0 libasound2 \
-            libx11-6 libxext6 libxrender1 libxcursor1 libxrandr2 libxi6 libxxf86vm1
+            libx11-6 libxext6 libxrender1 libxcursor1 libxrandr2 libxi6 libxxf86vm1 zip
 
       - name: Install Python deps
         run: |
@@ -46,46 +52,11 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build (PyInstaller, onedir)
+      - name: Build (PyInstaller onedir)
         run: |
-          # Clean previous outputs but keep your build/ folder (spec file lives there)
-          rm -rf dist .pyibld || true
+          python -c "import os; print('CWD:', os.getcwd())"
           pyinstaller --noconfirm --workpath .pyibld build/midi2furnace.spec
 
-      - name: Remove extra root exe if present (Windows quirk)
-        shell: bash
-        run: |
-          rm -f dist/midi2furnace.exe || true
-
-      - name: Zip artifact
-        shell: bash
-        run: |
-          cd dist
-          # Zip the onedir folder so users have all DLLs/libs
-          7z a -tzip "${{ matrix.artifact }}.zip" "midi2furnace" >/dev/null 2>&1 || \
-          zip -r "${{ matrix.artifact }}.zip" "midi2furnace"
-          ls -lah
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.artifact }}.zip
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*/*.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Windows-only: remove extra root exe if PyInstaller drops one
+      - name: Cleanup extra root exe (Windows)
+        if
