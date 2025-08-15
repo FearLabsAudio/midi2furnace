@@ -59,4 +59,46 @@ jobs:
 
       # Windows-only: remove extra root exe if PyInstaller drops one
       - name: Cleanup extra root exe (Windows)
-        if
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path dist\midi2furnace.exe) { Remove-Item dist\midi2furnace.exe -Force }
+
+      # Zip per OS
+      - name: Zip artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path dist\${{ matrix.artifact }}.zip) { Remove-Item dist\${{ matrix.artifact }}.zip -Force }
+          Compress-Archive -Path dist\midi2furnace\* -DestinationPath dist\${{ matrix.artifact }}.zip
+
+      - name: Zip artifact (macOS/Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          rm -f "dist/${{ matrix.artifact }}.zip"
+          (cd dist && zip -r "${{ matrix.artifact }}.zip" "midi2furnace")
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
