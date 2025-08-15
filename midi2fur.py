@@ -20,6 +20,8 @@ from input.play_keys import handle_play_keys
 from ui.tracker_panel import draw_tracker_settings_window
 from tracker.export import copy_selection_to_clipboard
 
+from version import __version__
+
 
 # Persist ImGui layout here
 UI_INI_PATH = "imgui.ini"
@@ -69,7 +71,7 @@ def main():
     size = (1280, 720)
     flags = DOUBLEBUF | OPENGL | RESIZABLE
     pygame.display.set_mode(size, flags)
-    pygame.display.set_caption("MIDI to Furnace Tool")
+    pygame.display.set_caption(f"Midi to Furnace v{__version__}")
     gl.glViewport(0, 0, *size)
 
     # --- Start Maximized (best effort) ---
