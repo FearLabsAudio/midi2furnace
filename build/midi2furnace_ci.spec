@@ -1,5 +1,5 @@
 # build/midi2furnace_ci.spec
-# Build in CI with:
+# CI build:
 #   pyinstaller --noconfirm --workpath .pyibld --distpath dist build/midi2furnace_ci.spec
 import os, sys
 from PyInstaller.utils.hooks import collect_submodules
@@ -17,7 +17,7 @@ hidden += collect_submodules("mido")
 if sys.platform.startswith("win"):
     hidden += ["OpenGL.platform.win32"]
 
-datas = []  # keep CI minimal & predictable
+datas = []  # keep CI minimal
 
 icon_file = None
 win_icon = os.path.join(PROJECT_DIR, "assets", "app.ico")
@@ -44,15 +44,18 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# IMPORTANT: empty list + exclude_binaries=True
 exe = EXE(
     pyz,
     a.scripts,
+    [],
+    exclude_binaries=True,
     name=APP_NAME,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,       # fewer surprises in CI
-    console=False,   # GUI app
+    upx=False,       # safer in CI
+    console=False,
     icon=icon_file,
 )
 

@@ -53,9 +53,23 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build (PyInstaller onedir, CI spec)
+      # Clean outputs (Windows / PowerShell)
+      - name: Clean dist & work (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path dist)   { Remove-Item dist   -Recurse -Force }
+          if (Test-Path .pyibld){ Remove-Item .pyibld -Recurse -Force }
+
+      # Clean outputs (macOS/Linux / bash)
+      - name: Clean dist & work (macOS/Linux)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
           rm -rf dist .pyibld || true
+
+      - name: Build (PyInstaller onedir, CI spec)
+        run: |
           pyinstaller --noconfirm --workpath .pyibld --distpath dist build/midi2furnace_ci.spec
 
       - name: Cleanup extra root exe (Windows quirk)
