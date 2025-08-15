@@ -1,5 +1,26 @@
+# Python caches
 __pycache__/
-sample\ MIDI\ files/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual envs
 .venv/
-build/midi2furnace/
+venv/
+env/
+
+# Local config/layout
+imgui.ini
+
+# PyInstaller outputs
 dist/
+.pyibld/             # our CI/local workpath scratch
+build/midi2furnace/
+
+# Samples (kept out of repo; ship via release assets if desired)
+sample\ MIDI\ files/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+*.log

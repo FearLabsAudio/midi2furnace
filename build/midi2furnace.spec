@@ -1,16 +1,16 @@
-# build/midi2furnace.spec
-# Build onedir (recommended):
-#   pyinstaller --noconfirm build\midi2furnace.spec
-# Build onefile:
-#   set ONEFILE=1 & pyinstaller --noconfirm build\midi2furnace.spec
-import os, sys
+# build/midi2furnace_ci.spec
+# Build with:
+#   pyinstaller --noconfirm --workpath .pyibld build/midi2furnace_ci.spec
+
+import os
+import sys
 from PyInstaller.utils.hooks import collect_submodules
 
 PROJECT_DIR = os.path.abspath(os.getcwd())
 ENTRY_SCRIPT = os.path.join(PROJECT_DIR, "midi2fur.py")
 APP_NAME = "midi2furnace"
-ONEFILE = os.environ.get("ONEFILE", "0") == "1"
 
+# Hidden imports (runtime-discovered modules)
 hidden = []
 hidden += collect_submodules("imgui")
 hidden += ["imgui.integrations.pygame"]
@@ -20,29 +20,10 @@ hidden += collect_submodules("mido")
 if sys.platform.startswith("win"):
     hidden += ["OpenGL.platform.win32"]
 
+# No extra datas in CI to avoid path snafus
 datas = []
 
-def add_file(rel_path, dest="."):
-    p = os.path.join(PROJECT_DIR, rel_path)
-    if os.path.exists(p):
-        datas.append((p, dest))
-
-def add_tree(rel_folder, dest_folder):
-    root = os.path.join(PROJECT_DIR, rel_folder)
-    if not os.path.isdir(root):
-        return
-    for r, _d, files in os.walk(root):
-        rel = os.path.relpath(r, root)
-        tgt = os.path.join(dest_folder, rel) if rel != "." else dest_folder
-        for f in files:
-            datas.append((os.path.join(r, f), tgt))
-
-# optional extras
-add_file("readme.md")
-add_file("requirements.txt")
-if os.path.isdir(os.path.join(PROJECT_DIR, "sample MIDI files")):
-    add_tree("sample MIDI files", "sample MIDI files")
-
+# Optional icons only if present (safe to be None)
 icon_file = None
 win_icon = os.path.join(PROJECT_DIR, "assets", "app.ico")
 mac_icon = os.path.join(PROJECT_DIR, "assets", "app.icns")
@@ -65,6 +46,7 @@ a = Analysis(
     excludes=[],
     noarchive=False,
 )
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
@@ -77,20 +59,16 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    console=False,
+    upx=False,          # turn off UPX in CI for fewer surprises
+    console=False,      # GUI app
     icon=icon_file,
 )
 
-if ONEFILE:
-    # single-file exe in dist\midi2furnace.exe
-    coll = exe
-else:
-    # folder build in dist\midi2furnace\midi2furnace.exe
-    coll = COLLECT(
-        exe,
-        a.binaries,
-        a.zipfiles,
-        a.datas,
-        name=APP_NAME,
-    )
+# One-dir (folder) build — safest for Pygame/OpenGL/SDL
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    name=APP_NAME,
+)
