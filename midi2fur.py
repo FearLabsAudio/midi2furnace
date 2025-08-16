@@ -70,27 +70,79 @@ def main():
     pygame.init()
     size = (1280, 720)
     flags = DOUBLEBUF | OPENGL | RESIZABLE
-    pygame.display.set_mode(size, flags)
-    pygame.display.set_caption(f"Midi to Furnace v{__version__}")
-    gl.glViewport(0, 0, *size)
 
-    # --- Start Maximized (best effort) ---
-    # Prefer SDL2-native maximize; fallback to resizing to desktop work-area size
-    try:
-        from pygame._sdl2.video import Window
-        Window.from_display_module().maximize()
-        size = pygame.display.get_surface().get_size()
-        gl.glViewport(0, 0, *size)
-    except Exception:
+    def try_make_gl(size, flags):
+        # Attempt 0: default (no attributes)
         try:
-            if hasattr(pygame.display, "get_desktop_sizes"):
-                ds = pygame.display.get_desktop_sizes()
-                if ds and isinstance(ds, (list, tuple)) and len(ds) > 0:
-                    size = ds[0]
-                    pygame.display.set_mode(size, flags)
-                    gl.glViewport(0, 0, *size)
-        except Exception:
-            pass
+            pygame.display.set_mode(size, flags)
+            return True, "default"
+        except Exception as e0:
+            print(f"[GL] default failed: {e0}")
+
+        # Attempt 1: very compatible GL 2.1 (compat profile), no extra buffers
+        try:
+            try:
+                pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_COMPATIBILITY)
+            except Exception:
+                pass
+            for attr, val in [
+                (pygame.GL_CONTEXT_MAJOR_VERSION, 2),
+                (pygame.GL_CONTEXT_MINOR_VERSION, 1),
+                (pygame.GL_DOUBLEBUFFER, 1),
+                (pygame.GL_DEPTH_SIZE, 0),
+                (pygame.GL_STENCIL_SIZE, 0),
+                (pygame.GL_MULTISAMPLEBUFFERS, 0),
+                (pygame.GL_MULTISAMPLESAMPLES, 0),
+            ]:
+                try: pygame.display.gl_set_attribute(attr, val)
+                except Exception: pass
+            pygame.display.set_mode(size, flags)
+            return True, "GL 2.1 compat"
+        except Exception as e1:
+            print(f"[GL] GL 2.1 compat failed: {e1}")
+
+        # Attempt 2: GL 3.2 core (some drivers prefer core profiles)
+        try:
+            try:
+                pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
+            except Exception:
+                pass
+            for attr, val in [
+                (pygame.GL_CONTEXT_MAJOR_VERSION, 3),
+                (pygame.GL_CONTEXT_MINOR_VERSION, 2),
+                (pygame.GL_DOUBLEBUFFER, 1),
+                (pygame.GL_DEPTH_SIZE, 0),
+                (pygame.GL_STENCIL_SIZE, 0),
+                (pygame.GL_MULTISAMPLEBUFFERS, 0),
+                (pygame.GL_MULTISAMPLESAMPLES, 0),
+            ]:
+                try: pygame.display.gl_set_attribute(attr, val)
+                except Exception: pass
+            pygame.display.set_mode(size, flags)
+            return True, "GL 3.2 core"
+        except Exception as e2:
+            print(f"[GL] GL 3.2 core failed: {e2}")
+
+        return False, "no GL context"
+
+    ok, mode = try_make_gl(size, flags)
+    if not ok:
+        print("\n[Error] Could not create an OpenGL context. On Linux, install Mesa GL/GLX and run under X11/XWayland.\n"
+            "Try: sudo apt install mesa-utils libgl1 libglu1-mesa libglx-mesa0\n"
+            "If using Wayland, run: SDL_VIDEODRIVER=x11 ./midi2furnace\n")
+        sys.exit(1)
+
+    pygame.display.set_caption("MIDI Piano Roll (pyimgui)")
+    gl.glViewport(0, 0, *pygame.display.get_surface().get_size())
+
+    # (optional) Log GL info to help diagnose remote users
+    try:
+        ver = gl.glGetString(gl.GL_VERSION)
+        rend = gl.glGetString(gl.GL_RENDERER)
+        print(f"[GL] Context: {mode} | Version: {ver!r} | Renderer: {rend!r}")
+    except Exception:
+        pass
+
 
     # --- ImGui init ---
     imgui.create_context()
